@@ -1,129 +1,154 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:geoflutterfire/geoflutterfire.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:rxdart/rxdart.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  runApp(
-    MaterialApp(
-      title: 'Geo Flutter Fire example',
-      home: MyApp(),
-      debugShowCheckedModeBanner: true,
-    ),
-  );
+void main() {
+  runApp(MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   @override
-  _MyAppState createState() => _MyAppState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Center(
+            child: Text('セブの両替所'),
+          ),
+        ),
+        body: MapCebu(),
+      ),
+    );
+  }
 }
 
-class _MyAppState extends State<MyApp> {
-  GoogleMapController? _mapController;
+class ExchangeMap extends StatefulWidget {
+  @override
+  _ExchangeMapState createState() => _ExchangeMapState();
+}
 
-  // firestore init
-  final radius = BehaviorSubject<double>.seeded(1.0);
-  final _firestore = FirebaseFirestore.instance;
-  final markers = <MarkerId, Marker>{};
+class _ExchangeMapState extends State<ExchangeMap> {
+  @override
+  Widget build(BuildContext context) {
+    return Container();
+  }
+}
 
-  late Stream<List<DocumentSnapshot>> stream;
-  late Geoflutterfire geo;
+class MapCebu extends StatefulWidget {
+  @override
+  State<MapCebu> createState() => MapCebuState();
+}
+
+class MapCebuState extends State<MapCebu> {
+  BitmapDescriptor pinLocationIcon = BitmapDescriptor.defaultMarkerWithHue(100);
+
+  Future<Uint8List?> imageChangeUint8List(
+      String path, int height, int width) async {
+    //画像のpathを読み込む
+    final ByteData byteData = await rootBundle.load(path);
+    final Codec codec = await instantiateImageCodec(
+      byteData.buffer.asUint8List(),
+      //高さ
+      targetHeight: height,
+      //幅
+      targetWidth: width,
+    );
+    final FrameInfo uiFI = await codec.getNextFrame();
+    return (await uiFI.image.toByteData(format: ImageByteFormat.png))!
+        .buffer
+        .asUint8List();
+  }
+
+  Future<void> pinMaker() async {
+    final Uint8List? uintData =
+        await imageChangeUint8List('assets/car_bus_11917.png', 100, 100);
+    setState(() {
+      pinLocationIcon = BitmapDescriptor.fromBytes(uintData!);
+    });
+  }
 
   @override
   void initState() {
     super.initState();
 
-    geo = Geoflutterfire();
-    GeoFirePoint center =
-        geo.point(latitude: 43.0779575, longitude: 141.337819);
-    stream = radius.switchMap(
-      (rad) {
-        final collectionReference = _firestore.collection('shop');
+    Future(() async {
+      await pinMaker();
+    });
 
-        return geo.collection(collectionRef: collectionReference).within(
-            center: center, radius: 100, field: 'position', strictMode: false);
-      },
-    );
-
-    //マップの横幅取得
-    Future(() async {});
+    setCustomMapPin();
   }
 
-  @override
-  void dispose() {
-    radius.close();
-    super.dispose();
-  }
+  Completer<GoogleMapController> _controller = Completer();
+
+  final Set<Marker> markers = {};
+  final List<LatLng> _markerLocations = [
+    // Ayala
+    const LatLng(10.318158, 123.904936),
+    // IT Park
+    const LatLng(10.328352, 123.905714),
+    const LatLng(10.330698, 123.907295),
+    // SM
+    const LatLng(10.312147, 123.918603),
+    // Banilad
+    const LatLng(10.340961, 123.913004),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: <Widget>[
-            Center(
-              child: Card(
-                elevation: 4,
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                child: SizedBox(
-                  height: 700,
-                  child: Stack(
-                    children: [
-                      GoogleMap(
-                        onMapCreated: _onMapCreated,
-                        initialCameraPosition: const CameraPosition(
-                          target: LatLng(43.0779575, 141.337819),
-                          zoom: 12,
-                        ),
-                        markers: Set<Marker>.of(markers.values),
-                      ),
-                    ],
-                  ),
-                ),
+    return Scaffold(
+      body: Column(
+        children: [
+          SizedBox(height: 100, child: Image.asset('assets/car_bus_11917.png')),
+          SizedBox(
+            height: 600,
+            child: GoogleMap(
+              initialCameraPosition: const CameraPosition(
+                target: LatLng(10.318158, 123.904936),
+                bearing: 30,
+                zoom: 13.4746,
               ),
+              compassEnabled: false,
+              myLocationEnabled: true,
+              padding: const EdgeInsets.only(
+                top: 400.0,
+              ),
+              markers: Set.from(
+                _createMarker(),
+              ),
+              onMapCreated: (GoogleMapController controller) {
+                _controller.complete(controller);
+              },
             ),
-            SizedBox(
-              height: 100,
-                child: Image.asset('assets/watermark.jpeg')),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  void _onMapCreated(GoogleMapController controller) async {
-    setState(() {
-      _mapController = controller;
-      //start listening after map is created
-      stream.listen((List<DocumentSnapshot> documentList) {
-        _updateMarkers(documentList);
-      });
+  Set<Marker> _createMarker() {
+    _markerLocations.asMap().forEach((i, markerLocation) {
+      markers.add(
+        Marker(
+          markerId: MarkerId('myMarker{$i}'),
+          position: markerLocation,
+          icon: pinLocationIcon,
+        ),
+      );
     });
+
+    return markers;
   }
 
-  void _addMarker(double lat, double lng) {
-    final id = MarkerId(lat.toString() + lng.toString());
-    final _marker = Marker(
-      markerId: id,
-      position: LatLng(lat, lng),
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
-      infoWindow: InfoWindow(title: 'latLng', snippet: '$lat,$lng'),
-    );
+  void setCustomMapPin() async {
+    final pinLocationIcon = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(devicePixelRatio: 100),
+        'assets/car_bus_11917.png');
     setState(() {
-      markers[id] = _marker;
-    });
-  }
-
-  void _updateMarkers(List<DocumentSnapshot> documentList) {
-    documentList.forEach((DocumentSnapshot document) {
-      final data = document.data() as Map<String, dynamic>;
-      final GeoPoint point = data['position']['geopoint'];
-      _addMarker(point.latitude, point.longitude);
+      this.pinLocationIcon = pinLocationIcon;
     });
   }
 }
