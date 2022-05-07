@@ -71,7 +71,7 @@ class _MyAppState extends State<MyApp> {
                 elevation: 4,
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 child: SizedBox(
-                  height: 800,
+                  height: 700,
                   child: Stack(
                     children: [
                       GoogleMap(
@@ -87,6 +87,9 @@ class _MyAppState extends State<MyApp> {
                 ),
               ),
             ),
+            SizedBox(
+              height: 100,
+                child: Image.asset('assets/watermark.jpeg')),
           ],
         ),
       ),
