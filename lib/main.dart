@@ -59,6 +59,7 @@ class _MyAppState extends State<MyApp> {
       },
     );
 
+    //マップの横幅取得
     Future(() async {
       //_mapControllerがinitializeされるのを待つ1秒
       await Future.delayed(const Duration(seconds: 1));
@@ -93,7 +94,7 @@ class _MyAppState extends State<MyApp> {
                 elevation: 4,
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 child: SizedBox(
-                  height: 550,
+                  height: 500,
                   child: Stack(
                     children: [
                       GoogleMap(
