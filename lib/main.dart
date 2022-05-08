@@ -135,6 +135,9 @@ class MapCebuState extends State<MapCebu> {
         Marker(
           markerId: MarkerId('myMarker{$i}'),
           position: markerLocation,
+          infoWindow: InfoWindow(title: 'バス',onTap: (){
+            print('詳細に遷移する');
+          }),
           icon: pinLocationIcon,
         ),
       );
