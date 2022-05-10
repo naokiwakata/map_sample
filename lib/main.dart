@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:custom_info_window/custom_info_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -26,18 +27,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class ExchangeMap extends StatefulWidget {
-  @override
-  _ExchangeMapState createState() => _ExchangeMapState();
-}
-
-class _ExchangeMapState extends State<ExchangeMap> {
-  @override
-  Widget build(BuildContext context) {
-    return Container();
-  }
-}
-
 class MapCebu extends StatefulWidget {
   @override
   State<MapCebu> createState() => MapCebuState();
@@ -45,6 +34,7 @@ class MapCebu extends StatefulWidget {
 
 class MapCebuState extends State<MapCebu> {
   BitmapDescriptor pinLocationIcon = BitmapDescriptor.defaultMarkerWithHue(100);
+  final _customInfoWindowController = CustomInfoWindowController();
 
   Future<Uint8List?> imageChangeUint8List(
       String path, int height, int width) async {
@@ -99,30 +89,38 @@ class MapCebuState extends State<MapCebu> {
 
   @override
   Widget build(BuildContext context) {
+    final markers = _createMarker();
     return Scaffold(
-      body: Column(
+      body: Stack(
         children: [
-          SizedBox(height: 100, child: Image.asset('assets/car_bus_11917.png')),
-          SizedBox(
-            height: 600,
-            child: GoogleMap(
-              initialCameraPosition: const CameraPosition(
-                target: LatLng(10.318158, 123.904936),
-                bearing: 30,
-                zoom: 13.4746,
-              ),
-              compassEnabled: false,
-              myLocationEnabled: true,
-              padding: const EdgeInsets.only(
-                top: 400.0,
-              ),
-              markers: Set.from(
-                _createMarker(),
-              ),
-              onMapCreated: (GoogleMapController controller) {
-                _controller.complete(controller);
-              },
+          GoogleMap(
+            initialCameraPosition: const CameraPosition(
+              target: LatLng(10.318158, 123.904936),
+              bearing: 30,
+              zoom: 13.4746,
             ),
+            compassEnabled: false,
+            myLocationEnabled: true,
+            padding: const EdgeInsets.only(
+              top: 400.0,
+            ),
+            markers: markers,
+            onMapCreated: (GoogleMapController controller) {
+              _controller.complete(controller);
+              _customInfoWindowController.googleMapController = controller;
+            },
+            onTap: (position) {
+              _customInfoWindowController.hideInfoWindow!();
+            },
+            onCameraMove: (position) {
+              _customInfoWindowController.onCameraMove!();
+            },
+          ),
+          CustomInfoWindow(
+            controller: _customInfoWindowController,
+            height: 75,
+            width: 150,
+            offset: 50,
           ),
         ],
       ),
@@ -130,18 +128,55 @@ class MapCebuState extends State<MapCebu> {
   }
 
   Set<Marker> _createMarker() {
-    _markerLocations.asMap().forEach((i, markerLocation) {
-      markers.add(
-        Marker(
-          markerId: MarkerId('myMarker{$i}'),
-          position: markerLocation,
-          infoWindow: InfoWindow(title: 'バス',onTap: (){
-            print('詳細に遷移する');
-          }),
-          icon: pinLocationIcon,
-        ),
-      );
-    });
+    _markerLocations.asMap().forEach(
+      (i, markerLocation) {
+        markers.add(
+          Marker(
+            markerId: MarkerId('myMarker{$i}'),
+            position: markerLocation,
+            onTap: () {
+              _customInfoWindowController.addInfoWindow!(
+                Column(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.account_circle,
+                                color: Colors.white,
+                                size: 30,
+                              ),
+                              SizedBox(
+                                width: 8.0,
+                              ),
+                              Text(
+                                "I am here",
+                              )
+                            ],
+                          ),
+                        ),
+                        width: double.infinity,
+                        height: double.infinity,
+                      ),
+                    ),
+                  ],
+                ),
+                markerLocation,
+              );
+            },
+            icon: pinLocationIcon,
+          ),
+        );
+      },
+    );
 
     return markers;
   }
